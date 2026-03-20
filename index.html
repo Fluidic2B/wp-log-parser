@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WP Activity Log Parser</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2230;
+    --border: #30363d;
+    --accent: #58a6ff;
+    --accent2: #3fb950;
+    --accent3: #f78166;
+    --accent4: #e3b341;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --pill-update: rgba(88,166,255,0.12);
+    --pill-install: rgba(63,185,80,0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    padding: 40px 24px;
+  }
+
+  .container { max-width: 860px; margin: 0 auto; }
+
+  header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 36px;
+  }
+
+  .logo {
+    width: 44px; height: 44px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), #1f6feb);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+
+  h1 {
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+
+  h1 span { color: var(--accent); }
+
+  .subtitle {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-top: 4px;
+    font-weight: 400;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .card-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+  }
+
+  .badge-update { background: var(--pill-update); color: var(--accent); border: 1px solid rgba(88,166,255,0.25); }
+  .badge-install { background: var(--pill-install); color: var(--accent2); border: 1px solid rgba(63,185,80,0.25); }
+
+  textarea {
+    width: 100%;
+    min-height: 180px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    padding: 14px 16px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--muted); }
+
+  .btn-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0d1117;
+  }
+  .btn-primary:hover { background: #79c0ff; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+
+  .btn-ghost {
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  .btn-copy {
+    background: var(--surface2);
+    color: var(--accent2);
+    border: 1px solid rgba(63,185,80,0.3);
+    margin-left: auto;
+  }
+  .btn-copy:hover { background: rgba(63,185,80,0.1); }
+
+  /* Results */
+  #results { display: none; }
+
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.82rem;
+  }
+
+  .stat-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+
+  .stat-num.blue { color: var(--accent); }
+  .stat-num.green { color: var(--accent2); }
+  .stat-num.total { color: var(--text); }
+
+  .plugin-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 16px;
+  }
+
+  .plugin-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.87rem;
+    transition: border-color 0.15s;
+    animation: fadeSlide 0.25s ease both;
+  }
+
+  .plugin-item:hover { border-color: var(--muted); }
+
+  @keyframes fadeSlide {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .plugin-name {
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .version-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+    color: var(--muted);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .arrow {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .version-new { color: var(--accent2); }
+  .version-single { color: var(--accent2); }
+
+  .type-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot-update { background: var(--accent); }
+  .dot-install { background: var(--accent2); }
+
+  .output-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.8;
+    white-space: pre;
+    overflow-x: auto;
+    color: var(--text);
+  }
+
+  .error-msg {
+    background: rgba(247,129,102,0.1);
+    border: 1px solid rgba(247,129,102,0.3);
+    color: var(--accent3);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 0.84rem;
+    display: none;
+  }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    background: var(--accent2);
+    color: #0d1117;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 0.82rem;
+    padding: 10px 18px;
+    border-radius: 8px;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.2s;
+    pointer-events: none;
+  }
+  .copied-toast.show { opacity: 1; transform: translateY(0); }
+
+  hr.divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 20px 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">⚡</div>
+    <div>
+      <h1>WP Activity <span>Log Parser</span></h1>
+      <div class="subtitle">Parses event codes 5000 (installs) &amp; 5004 (updates) → clean plugin change list</div>
+    </div>
+  </header>
+
+  <!-- Input -->
+  <div class="card">
+    <div class="card-label">
+      📋 Paste Raw Log Data
+      <span class="badge badge-update">5004 Updates</span>
+      <span class="badge badge-install">5000 Installs</span>
+    </div>
+    <textarea id="rawInput" placeholder="Paste your WP Activity Log raw data here (mix of 5000 and 5004 entries)..."></textarea>
+    <div class="btn-row">
+      <button class="btn-primary" onclick="parseLog()">⚡ Parse Log</button>
+      <button class="btn-ghost" onclick="clearAll()">✕ Clear</button>
+      <button class="btn-ghost" onclick="loadSample()">Load Sample</button>
+    </div>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <!-- Results -->
+  <div id="results">
+    <div class="card">
+      <div class="card-label">📊 Summary</div>
+      <div class="stats-row" id="statsRow"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">🔌 Plugin Changes (A–Z)</div>
+      <ul class="plugin-list" id="pluginList"></ul>
+
+      <hr class="divider">
+
+      <div class="card-label" style="margin-bottom:10px;">📄 Plain Text Output</div>
+      <div class="output-box" id="outputBox"></div>
+
+      <div class="btn-row" style="margin-top:14px;">
+        <button class="btn-copy" onclick="copyOutput()">📋 Copy to Clipboard</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="copied-toast" id="toast">✓ Copied!</div>
+
+<script>
+const SAMPLE = `5004March 20, 2026 11:33:20.000 am
+Omar Abrahim Administrator47.19.51.200PluginUpdated
+Updated the plugin LiteSpeed Cache. Updated version: 7.8.0.1 Install location: litespeed-cache Previous version: 7.8 View plugin information
+More details...Select id5004March 20, 2026 11:30:22.000 am
+Omar Abrahim Administrator47.19.51.200PluginUpdated
+Updated the plugin bunny.net. Updated version: 3.0.0 Install location: bunnycdn Previous version: 2.3.8
+500020 March, 2026 11:10:21.000 am
+oabrahim Administrator69.113.117.38PluginInstalled
+Installed the plugin Advanced Custom Fields Multilingual. Version: 2.2.2 Install location: D:\\ca_htdocs/wp-content/plugins\\wpml-acf.php View plugin information
+More details...Select id500020 March, 2026 11:09:46.000 am
+oabrahim Administrator69.113.117.38PluginInstalled
+Installed the plugin WPML SEO. Version: 2.2.5 Install location: D:\\ca_htdocs/wp-content/plugins\\plugin.php View plugin information`;
+
+function loadSample() {
+  document.getElementById('rawInput').value = SAMPLE;
+}
+
+function clearAll() {
+  document.getElementById('rawInput').value = '';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('errorMsg').style.display = 'none';
+}
+
+function parseLog() {
+  const raw = document.getElementById('rawInput').value.trim();
+  const errEl = document.getElementById('errorMsg');
+  errEl.style.display = 'none';
+
+  if (!raw) {
+    showError('Please paste some log data first.');
+    return;
+  }
+
+  const results = [];
+
+  // ── Parse 5004 UPDATE entries ──────────────────────────────────────────────
+  // Pattern: "Updated the plugin NAME. Updated version: VER ... Previous version: VER"
+  const updateRegex = /Updated the plugin ([^.]+?)\.\s+Updated version:\s*([\d.]+).*?Previous version:\s*([\d.]+)/gs;
+  let m;
+  while ((m = updateRegex.exec(raw)) !== null) {
+    results.push({
+      name: m[1].trim(),
+      type: 'update',
+      oldVersion: m[3].trim(),
+      newVersion: m[2].trim()
+    });
+  }
+
+  // ── Parse 5000 INSTALL entries ─────────────────────────────────────────────
+  // Pattern: "Installed the plugin NAME. Version: VER"
+  const installRegex = /Installed the plugin ([^.]+?)\.\s+Version:\s*([\d.]+)/gs;
+  while ((m = installRegex.exec(raw)) !== null) {
+    results.push({
+      name: m[1].trim(),
+      type: 'install',
+      version: m[2].trim()
+    });
+  }
+
+  if (results.length === 0) {
+    showError('No plugin events found. Make sure your data contains 5000 (install) or 5004 (update) log entries.');
+    return;
+  }
+
+  // Sort A–Z by plugin name
+  results.sort((a, b) => a.name.localeCompare(b.name));
+
+  const updates  = results.filter(r => r.type === 'update');
+  const installs = results.filter(r => r.type === 'install');
+
+  // ── Render stats ───────────────────────────────────────────────────────────
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat"><span class="stat-num total">${results.length}</span> <span>Total Changes</span></div>
+    <div class="stat"><span class="stat-num blue">${updates.length}</span> <span>Updates</span></div>
+    <div class="stat"><span class="stat-num green">${installs.length}</span> <span>New Installs</span></div>
+  `;
+
+  // ── Render visual list ─────────────────────────────────────────────────────
+  const listEl = document.getElementById('pluginList');
+  listEl.innerHTML = '';
+  results.forEach((r, i) => {
+    const li = document.createElement('li');
+    li.className = 'plugin-item';
+    li.style.animationDelay = `${i * 30}ms`;
+
+    if (r.type === 'update') {
+      li.innerHTML = `
+        <span class="type-dot dot-update" title="Update"></span>
+        <span class="plugin-name">${esc(r.name)}</span>
+        <span class="version-info">
+          ${esc(r.oldVersion)} <span class="arrow">→</span> <span class="version-new">${esc(r.newVersion)}</span>
+        </span>
+        <span class="badge badge-update">update</span>`;
+    } else {
+      li.innerHTML = `
+        <span class="type-dot dot-install" title="Install"></span>
+        <span class="plugin-name">${esc(r.name)}</span>
+        <span class="version-info">
+          <span class="version-single">${esc(r.version)}</span>
+        </span>
+        <span class="badge badge-install">new</span>`;
+    }
+    listEl.appendChild(li);
+  });
+
+  // ── Render plain text output ───────────────────────────────────────────────
+  const lines = results.map(r =>
+    r.type === 'update'
+      ? `${r.name} ${r.oldVersion} → ${r.newVersion}`
+      : `${r.name} ${r.version} (new install)`
+  );
+  const plainText = lines.join('\n');
+  document.getElementById('outputBox').textContent = plainText;
+
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyOutput() {
+  const text = document.getElementById('outputBox').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    const toast = document.getElementById('toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('results').style.display = 'none';
+}
+
+function esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
